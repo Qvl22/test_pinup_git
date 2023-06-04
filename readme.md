@@ -73,3 +73,5 @@ OR facility_name ILIKE '%juice%');
 &emsp; 1.3) pe_desc_third_issued містить в собі назви pe_description, кількість випадків яких співпадає з кількістю випадків третьої за частотою pe_description(тобто числу з попередньої CTE)
 
 2) Основний SELECT відображає назви закладів, pe_description яких є в переліку, який дає третя CTE (pe_desc_third_issued)
+
+Фінальна задача "Output the name of the facilities that contain 3rd most common category." може бути сприйнята двояко. Перше - виконати всі дії і вивести список закладів, pe_description яких підпадає під умови, або друге - виконати всі дії і вивести список закладів, ЯКІ МАЮТЬ В НАЗВІ CAFE, TEA АБО JUICE і pe_description яких підпадає під умови. Я вирішив виконати завдання саме за другим твердженням.
