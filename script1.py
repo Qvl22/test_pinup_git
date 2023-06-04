@@ -26,7 +26,7 @@ def watch_folders() -> None:
         
 def get_files(folders: List[Path]) -> List[str]:
     """
-    Retrieves the list of folders.
+    Reads the names of the files in the given folders.
     Args:
         folders: A list of folders to check.
     Returns:
