@@ -78,7 +78,14 @@ def task1(payments_df: pd.DataFrame, bets_df: pd.DataFrame) -> pd.DataFrame:
     """
 
     grouped = payments_df.groupby('player_id')
-    result = pd.DataFrame()
+    columns = ['player_id',
+               'deposit_time',
+               'bet_time',
+               'withdrawal_time',
+               'bet_result',
+               'deposit_amount, EUR',
+               'bet_amount, EUR']
+    result = pd.DataFrame(columns=columns)
 
     for player_id, group in grouped:
 
@@ -99,13 +106,14 @@ def task1(payments_df: pd.DataFrame, bets_df: pd.DataFrame) -> pd.DataFrame:
                                                               current_row['paid_amount_eur'] * 1.1))]
 
                 if bet.shape[0] > 0:
-                    new_rows = pd.DataFrame({'player_id': [player_id],
-                                             'deposit_time': [current_row['Date']],
-                                             'bet_time': [bet.iloc[0]['accept_time']],
-                                             'withdrawal_time': [next_row['Date']],
-                                             'bet_result': [bet.iloc[0]['result']],
-                                             'deposit_amount, EUR': [current_row['paid_amount_eur']],
-                                             'bet_amount, EUR': [bet.iloc[0]['amount_eur']]})
+                    new_rows = pd.DataFrame([[player_id,
+                                             current_row['Date'],
+                                             bet.iloc[0]['accept_time'],
+                                             next_row['Date'],
+                                             bet.iloc[0]['result'],
+                                             current_row['paid_amount_eur'],
+                                             bet.iloc[0]['amount_eur']]],
+                                            columns=columns)
                     result = pd.concat([result, new_rows])
     return result
 
@@ -122,8 +130,7 @@ def task2(bets_df: pd.DataFrame) -> pd.DataFrame:
     bets_df['coef'] = np.where(bets_df.result == 'Win', bets_df['payout'] / bets_df['amount'], 0)
     bets_df = bets_df.sort_values(['player_id', 'accept_time'])
 
-    mapping = {"Win": 1, "Lose": 0}
-    bets_df['result_coef_bool'] = np.where(bets_df['coef'] > 1.5, bets_df['result'].map(mapping), 0)
+    bets_df['result_coef_bool'] = np.where(bets_df['coef'] > 1.5, 1, 0)
 
     grouper = (bets_df.result_coef_bool != bets_df.result_coef_bool.shift()).cumsum()
     bets_df['winstreak'] = bets_df.result_coef_bool.groupby(grouper).cumsum()
