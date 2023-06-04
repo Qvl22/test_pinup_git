@@ -1,7 +1,7 @@
 import pandas as pd
 from pathlib import Path
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List
 
 FOLDERS_TO_CHECK = {'Bets': Path('bets'), 'Payments': Path('payments')}
@@ -63,8 +63,72 @@ def date_handling(date_str: str) -> str:
     return date_str[:2] + '/' + date_str[2:4] + '/' + date_str[4:]
 
 
+def task1_alternative(payments_df: pd.DataFrame, bets_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Different algorithm: we process deposit, then trying to find a bet between (deposit_time, deposit_time+1h) with
+    amount in +-10% of deposit. Lastly, trying to find a withdrawal action after the bet but before the deposit_time+1h.
+        Based on the data in the 'payments' and 'bets' folders, finds a customers who performed the following
+        sequence of operations:
+            1)Deposit;
+            2) Bet for an amount within +/- 10% of the deposit;
+            3) Withdrawal within an hour from the deposit using a different system than the deposit.
+
+        Args:      payments_df: The DataFrame containing payment data.
+                   bets_df: The DataFrame containing bet data.
+
+        Returns:   A DataFrame containing the results of task.
+    """
+    rename_map_payments = {'Date': 'date', 'transaction_type': 'action', 'paid_amount_eur': 'amount'}
+    task_payments = payments_df[['player_id', 'Date', 'transaction_type', 'paid_amount_eur']].rename(
+        columns=rename_map_payments)
+
+    bets_df['action'] = 'bet'
+    rename_map_bets = {'accept_time': 'date', 'amount_eur': 'amount'}
+    task_bets = bets_df[['player_id', 'accept_time', 'action', 'amount_eur']].rename(columns=rename_map_bets)
+
+    df = pd.concat([task_payments, task_bets])
+    df = df.sort_values(['player_id', 'date'])
+    grouped = df.groupby('player_id')
+
+    res_columns = ['player_id',
+                   'deposit_time',
+                   'bet_time',
+                   'withdrawal_time',
+                   'deposit_amount, EUR',
+                   'bet_amount, EUR']
+    result = pd.DataFrame(columns=res_columns)
+
+    for player_id, group in grouped:
+        for i in range(len(group) - 2):
+            if group.iloc[i].action == 'deposit':
+                dep_row = group.iloc[i]
+                end_date = dep_row.date + timedelta(hours=1)
+
+                bet_rows = group.loc[(group.action == 'bet') &
+                                     (group.date.between(dep_row.date, end_date)) &
+                                     (group.amount.between(dep_row.amount * 0.9, dep_row.amount * 1.1))]
+
+                if not bet_rows.empty:
+                    for index, bet_row in bet_rows.iterrows():
+                        withd_rows = group.loc[(group.action == 'withdrawal') &
+                                               (group.date.between(bet_row.date, end_date))]
+
+                        if not withd_rows.empty:
+                            new_result = pd.DataFrame([[player_id,
+                                                        dep_row['date'],
+                                                        bet_row['date'],
+                                                        withd_rows.iloc[0]['date'],
+                                                        dep_row['amount'],
+                                                        bet_row['amount']]],
+                                                      columns=res_columns)
+                            result = pd.concat([result, new_result])
+    return result
+
+
 def task1(payments_df: pd.DataFrame, bets_df: pd.DataFrame) -> pd.DataFrame:
     """
+    Algorithm: tries to find deposit, so the next element should be withdrawal in payments table. Checks time difference
+    because it should be less than a hour. Tries to find a bet in an interval between deposit and withdrawal action.
         Based on the data in the 'payments' and 'bets' folders, finds a customers who performed the following
         sequence of operations:
             1)Deposit;
@@ -82,7 +146,6 @@ def task1(payments_df: pd.DataFrame, bets_df: pd.DataFrame) -> pd.DataFrame:
                'deposit_time',
                'bet_time',
                'withdrawal_time',
-               'bet_result',
                'deposit_amount, EUR',
                'bet_amount, EUR']
     result = pd.DataFrame(columns=columns)
@@ -107,12 +170,11 @@ def task1(payments_df: pd.DataFrame, bets_df: pd.DataFrame) -> pd.DataFrame:
 
                 if bet.shape[0] > 0:
                     new_rows = pd.DataFrame([[player_id,
-                                             current_row['Date'],
-                                             bet.iloc[0]['accept_time'],
-                                             next_row['Date'],
-                                             bet.iloc[0]['result'],
-                                             current_row['paid_amount_eur'],
-                                             bet.iloc[0]['amount_eur']]],
+                                              current_row['Date'],
+                                              bet.iloc[0]['accept_time'],
+                                              next_row['Date'],
+                                              current_row['paid_amount_eur'],
+                                              bet.iloc[0]['amount_eur']]],
                                             columns=columns)
                     result = pd.concat([result, new_rows])
     return result
@@ -141,8 +203,8 @@ def task2(bets_df: pd.DataFrame) -> pd.DataFrame:
     grouped = bets_df[bets_df['winstreak'] >= 5].groupby(['player_id'])
     for player_id, group in grouped:
         new_rows = pd.DataFrame([[player_id,
-                                 group.loc[group['winstreak'].max() == group['winstreak'], 'accept_time'].values[0],
-                                 group.loc[group['winstreak'].max() == group['winstreak'], 'winstreak'].values[0]]],
+                                  group.loc[group['winstreak'].max() == group['winstreak'], 'accept_time'].values[0],
+                                  group.loc[group['winstreak'].max() == group['winstreak'], 'winstreak'].values[0]]],
                                 columns=columns)
 
         result = pd.concat([result, new_rows])
@@ -179,5 +241,6 @@ if __name__ == "__main__":
     bets = bets.sort_values('accept_time')
 
     now = datetime.now()
-    task1(payments, bets).to_csv(f'result/result{now.strftime("%S%M%H%d%m%Y")}.csv')
+    # task1(payments, bets).to_csv(f'result/result{now.strftime("%S%M%H%d%m%Y")}.csv')
+    task1_alternative(payments, bets).to_csv(f'result/result{now.strftime("%S%M%H%d%m%Y")}.csv')
     task2(bets).to_csv(f'result/bets_result{now.strftime("%S%M%H%d%m%Y")}.csv')
